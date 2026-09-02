@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Link } from 'react-router-dom';
-import { PlusCircle, Search, Filter, RefreshCw, Trash2, Edit3 } from 'lucide-react';
+import { PlusCircle, Search, Filter, RefreshCw, Trash2, Edit3, X } from 'lucide-react';
 
 export const UserSubmissions = () => {
   const [submissions, setSubmissions] = useState([]);
@@ -52,14 +52,12 @@ export const UserSubmissions = () => {
   };
 
   useEffect(() => {
-    fetchSubmissions(1);
-  }, [status, categoryId, priority, targetMonth]);
+    const timer = setTimeout(() => {
+      fetchSubmissions();
+    }, 400);
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    fetchSubmissions(1);
-  };
-
+    return () => clearTimeout(timer);
+  }, [search, status, categoryId, priority, targetMonth]);
   const handleDelete = async (id, nomor) => {
     if (!window.confirm(`Yakin ingin membatalkan dan menghapus pengajuan [${nomor}]?`)) return;
 
@@ -97,25 +95,55 @@ export const UserSubmissions = () => {
         </Link>
       </div>
 
+            {/* QUICK STATUS TABS (Tombol Pilihan Status Cepat) */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs font-semibold">
+        {[
+          { label: 'Semua Status', value: '' },
+          { label: 'Menunggu', value: 'Menunggu', color: 'text-amber-700 bg-amber-50 border-amber-200' },
+          { label: 'Diproses', value: 'Diproses', color: 'text-blue-700 bg-blue-50 border-blue-200' },
+          { label: 'Disetujui', value: 'Disetujui', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+          { label: 'Selesai', value: 'Selesai', color: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
+          { label: 'Ditolak', value: 'Ditolak', color: 'text-rose-700 bg-rose-50 border-rose-200' },
+        ].map((tab) => {
+          const isActive = status === tab.value;
+          return (
+            <button
+              key={tab.label}
+              onClick={() => setStatus(tab.value)}
+              className={`px-3.5 py-1.5 rounded-xl border transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                isActive
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* SEARCH BAR DENGAN TOMBOL CLEAR (X)  */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-        <form onSubmit={handleSearchSubmit} className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari nomor pengajuan atau nama barang..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-            />
-          </div>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm rounded-xl transition"
-          >
-            Cari
-          </button>
-        </form>
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Ketik langsung untuk mencari nomor pengajuan, nama barang..."
+            className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200 transition"
+              title="Hapus pencarian"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-100">
           <select

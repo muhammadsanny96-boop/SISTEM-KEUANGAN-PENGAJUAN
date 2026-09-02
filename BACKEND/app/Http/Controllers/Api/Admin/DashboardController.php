@@ -17,47 +17,154 @@ class DashboardController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        // System wide stats
-        $totalSubmissions = Submission::count();
-        $pendingCount = Submission::where('status', 'Menunggu')->count();
-        $inProgressCount = Submission::where('status', 'Diproses')->count();
-        $approvedCount = Submission::where('status', 'Disetujui')->count();
-        $rejectedCount = Submission::where('status', 'Ditolak')->count();
-        $completedCount = Submission::where('status', 'Selesai')->count();
+        // 1. Format Periode Bulan Ini & Bulan Depan
+        $currentMonthCode = now()->format('Y-m'); // "2026-09"
+        $nextMonthCode = now()->addMonth()->format('Y-m'); // "2026-10"
+        
+        $currentMonthName = now()->translatedFormat('F Y'); // "September 2026"
+        $nextMonthName = now()->addMonth()->translatedFormat('F Y'); // "Oktober 2026"
+        
+        $currentMonthText = now()->translatedFormat('F'); // "September"
+        $nextMonthText = now()->addMonth()->translatedFormat('F'); // "Oktober"
+
+        $activeStatuses = ['Menunggu', 'Diproses', 'Disetujui', 'Selesai'];
+        $approvedStatuses = ['Disetujui', 'Selesai'];
+
+        // Cek jika admin memilih filter bulan tertentu di dashboard (misal: '2026-10' atau 'Oktober 2026')
+        $selectedPeriod = $request->query('target_bulan');
+        $activePeriodCode = $selectedPeriod ?: $currentMonthCode;
+
+        // 2. Hitung Jumlah Status Pengajuan (Berdasarkan filter periode jika ada, atau seluruhnya)
+        $submissionsQuery = Submission::query();
+        if ($selectedPeriod) {
+            $submissionsQuery->where(function ($q) use ($selectedPeriod) {
+                $q->where('target_bulan', $selectedPeriod)
+                  ->orWhere('target_bulan', 'LIKE', "%$selectedPeriod%")
+                  ->orWhere('tanggal_realisasi', 'LIKE', "$selectedPeriod%");
+            });
+        }
+
+        $totalSubmissions = (clone $submissionsQuery)->count();
+        $pendingCount = (clone $submissionsQuery)->where('status', 'Menunggu')->count();
+        $inProgressCount = (clone $submissionsQuery)->where('status', 'Diproses')->count();
+        $approvedCount = (clone $submissionsQuery)->where('status', 'Disetujui')->count();
+        $rejectedCount = (clone $submissionsQuery)->where('status', 'Ditolak')->count();
+        $completedCount = (clone $submissionsQuery)->where('status', 'Selesai')->count();
 
         $totalUsers = User::where('role', 'user')->count();
         $totalDivisions = Division::count();
         $totalCategories = Category::count();
 
-        // Financial Expenses Metrics
-        $currentMonth = now()->format('Y-m');
-        $nextMonth = now()->addMonth()->format('Y-m');
-        $currentMonthName = now()->translatedFormat('F Y');
-        $nextMonthName = now()->addMonth()->translatedFormat('F Y');
+        // 3. Hitung Usulan Bulan Ini (Mencakup format 2026-09 maupun 'September 2026')
+        $expenseThisMonth = (float) Submission::where(function ($q) use ($currentMonthCode, $currentMonthText) {
+            $q->where('target_bulan', $currentMonthCode)
+              ->orWhere('target_bulan', 'LIKE', "%$currentMonthText%")
+              ->orWhere('tanggal_realisasi', 'LIKE', "$currentMonthCode%");
+        })->whereIn('status', $activeStatuses)->sum('total_biaya');
 
-        $activeStatuses = ['Menunggu', 'Diproses', 'Disetujui', 'Selesai'];
-        $approvedStatuses = ['Disetujui', 'Selesai'];
+        // 4. Hitung Realisasi Bulan Ini
+        $realizedThisMonth = (float) Submission::where(function ($q) use ($currentMonthCode, $currentMonthText) {
+            $q->where('target_bulan', $currentMonthCode)
+              ->orWhere('target_bulan', 'LIKE', "%$currentMonthText%")
+              ->orWhere('tanggal_realisasi', 'LIKE', "$currentMonthCode%");
+        })->whereIn('status', $approvedStatuses)
+          ->whereNotNull('biaya_realisasi')
+          ->sum('biaya_realisasi');
 
-        $expenseThisMonth = (float) Submission::where('target_bulan', $currentMonth)
-            ->whereIn('status', $activeStatuses)
-            ->sum('total_biaya');
+        if ($realizedThisMonth == 0) {
+            $realizedThisMonth = (float) Submission::where(function ($q) use ($currentMonthCode, $currentMonthText) {
+                $q->where('target_bulan', $currentMonthCode)
+                  ->orWhere('target_bulan', 'LIKE', "%$currentMonthText%")
+                  ->orWhere('tanggal_realisasi', 'LIKE', "$currentMonthCode%");
+            })->whereIn('status', $approvedStatuses)->sum('total_biaya');
+        }
 
-        $realizedThisMonth = (float) Submission::where('target_bulan', $currentMonth)
-            ->whereIn('status', $approvedStatuses)
-            ->sum('total_biaya');
+        // 5. Hitung Proyeksi Bulan Depan
+        $expenseNextMonth = (float) Submission::where(function ($q) use ($nextMonthCode, $nextMonthText) {
+            $q->where('target_bulan', $nextMonthCode)
+              ->orWhere('target_bulan', 'LIKE', "%$nextMonthText%")
+              ->orWhere('tanggal_realisasi', 'LIKE', "$nextMonthCode%");
+        })->whereIn('status', $activeStatuses)->sum('total_biaya');
 
-        $expenseNextMonth = (float) Submission::where('target_bulan', $nextMonth)
-            ->whereIn('status', $activeStatuses)
-            ->sum('total_biaya');
+        $realizedNextMonth = (float) Submission::where(function ($q) use ($nextMonthCode, $nextMonthText) {
+            $q->where('target_bulan', $nextMonthCode)
+              ->orWhere('target_bulan', 'LIKE', "%$nextMonthText%")
+              ->orWhere('tanggal_realisasi', 'LIKE', "$nextMonthCode%");
+        })->whereIn('status', $approvedStatuses)
+          ->whereNotNull('biaya_realisasi')
+          ->sum('biaya_realisasi');
 
-        // Chart Data 1: Submissions count per division
-        $divisions = Division::withCount('submissions')->orderBy('nama_divisi')->get();
+        // 6. Generate Data 12 Bulan (Januari - Desember) untuk Diagram Kolom React
+        $namaBulan = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+        $tahunIni = now()->year;
+        $monthlyStats = [];
 
-        // Recent Submissions
-        $recentSubmissions = Submission::with(['user', 'division', 'category'])
-            ->latest()
-            ->take(8)
-            ->get();
+        foreach ($namaBulan as $num => $bulan) {
+            $bulanKode = sprintf('%04d-%02d', $tahunIni, $num);
+
+            $usulanBulan = (float) Submission::where(function ($q) use ($bulanKode, $bulan) {
+                $q->where('target_bulan', $bulanKode)
+                  ->orWhere('target_bulan', 'LIKE', "%$bulan%")
+                  ->orWhere('tanggal_realisasi', 'LIKE', "$bulanKode%");
+            })->whereIn('status', $activeStatuses)->sum('total_biaya');
+
+            $realisasiBulan = (float) Submission::where(function ($q) use ($bulanKode, $bulan) {
+                $q->where('target_bulan', $bulanKode)
+                  ->orWhere('target_bulan', 'LIKE', "%$bulan%")
+                  ->orWhere('tanggal_realisasi', 'LIKE', "$bulanKode%");
+            })->whereIn('status', $approvedStatuses)
+              ->whereNotNull('biaya_realisasi')
+              ->sum('biaya_realisasi');
+
+            if ($realisasiBulan == 0) {
+                $realisasiBulan = (float) Submission::where(function ($q) use ($bulanKode, $bulan) {
+                    $q->where('target_bulan', $bulanKode)
+                      ->orWhere('target_bulan', 'LIKE', "%$bulan%")
+                      ->orWhere('tanggal_realisasi', 'LIKE', "$bulanKode%");
+                })->where('status', 'Selesai')->sum('total_biaya');
+            }
+
+            $monthlyStats[] = [
+                'name' => substr($bulan, 0, 3),
+                'fullMonth' => $bulan,
+                'usulan' => $usulanBulan,
+                'realisasi' => $realisasiBulan,
+            ];
+        }
+
+        // 7. Data Distribusi Anggaran Divisi BERDASARKAN PERIODE BULAN YANG SEDANG DILIHAT
+        $divisions = Division::with(['submissions' => function ($q) use ($activePeriodCode, $currentMonthText, $activeStatuses) {
+            $q->where(function ($subQ) use ($activePeriodCode, $currentMonthText) {
+                $subQ->where('target_bulan', $activePeriodCode)
+                     ->orWhere('target_bulan', 'LIKE', "%$activePeriodCode%")
+                     ->orWhere('tanggal_realisasi', 'LIKE', "$activePeriodCode%");
+            })->whereIn('status', $activeStatuses);
+        }])->orderBy('nama_divisi')->get()->map(function ($d) {
+            $totalBiaya = (float) $d->submissions->sum('total_biaya');
+            $totalRealisasi = (float) $d->submissions->whereIn('status', ['Disetujui', 'Selesai'])->sum('biaya_realisasi');
+            return [
+                'id' => $d->id,
+                'nama_divisi' => $d->nama_divisi,
+                'submissions_count' => $d->submissions->count(),
+                'total_biaya' => $totalBiaya,
+                'total_realisasi' => $totalRealisasi,
+            ];
+        });
+
+        // 8. Pengajuan Terbaru Masuk
+        $recentSubmissionsQuery = Submission::with(['user', 'division', 'category'])->latest();
+        if ($selectedPeriod) {
+            $recentSubmissionsQuery->where(function ($q) use ($selectedPeriod) {
+                $q->where('target_bulan', $selectedPeriod)
+                  ->orWhere('target_bulan', 'LIKE', "%$selectedPeriod%")
+                  ->orWhere('tanggal_realisasi', 'LIKE', "$selectedPeriod%");
+            });
+        }
+        $recentSubmissions = $recentSubmissionsQuery->take(8)->get();
 
         return response()->json([
             'status' => 'success',
@@ -77,11 +184,13 @@ class DashboardController extends Controller
                     'expense_this_month' => $expenseThisMonth,
                     'realized_this_month' => $realizedThisMonth,
                     'expense_next_month' => $expenseNextMonth,
+                    'realized_next_month' => $realizedNextMonth,
                     'current_month_name' => $currentMonthName,
                     'next_month_name' => $nextMonthName,
                 ],
                 'division_stats' => $divisions,
                 'recent_submissions' => $recentSubmissions,
+                'monthly_stats' => $monthlyStats,
             ],
         ]);
     }

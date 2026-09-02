@@ -241,22 +241,62 @@ class SubmissionController extends Controller
         }
 
         $request->validate([
-            'pesan' => 'required|string|max:2000',
+            'pesan' => 'nullable|string|max:2000',
+            'biaya_realisasi' => 'nullable|numeric|min:0',
+            'tanggal_realisasi' => 'nullable|date',
+            'bukti_pembelian' => 'nullable|file|mimes:jpg,jpeg,png,pdf,webp|max:5120',
         ]);
 
-        $reply = SubmissionReply::create([
-            'submission_id' => $submission->id,
-            'admin_id' => $user->id,
-            'pesan' => $request->input('pesan'),
-            'status_setelah_balasan' => null,
-        ]);
+        // 1. Simpan Biaya Realisasi & File Nota Pembelian jika diunggah oleh User
+        $hasRealisasi = false;
+        if ($request->filled('biaya_realisasi')) {
+            $submission->biaya_realisasi = (float) $request->input('biaya_realisasi');
+            if ($submission->jumlah > 0) {
+                $submission->harga_beli_satuan = $submission->biaya_realisasi / $submission->jumlah;
+            }
+            $hasRealisasi = true;
+        }
 
-        $reply->load('admin');
+        if ($request->filled('tanggal_realisasi')) {
+            $submission->tanggal_realisasi = $request->input('tanggal_realisasi');
+            $hasRealisasi = true;
+        }
+
+        if ($request->hasFile('bukti_pembelian')) {
+            if ($submission->bukti_pembelian && Storage::disk('public')->exists($submission->bukti_pembelian)) {
+                Storage::disk('public')->delete($submission->bukti_pembelian);
+            }
+            $submission->bukti_pembelian = $request->file('bukti_pembelian')->store('receipts', 'public');
+            $hasRealisasi = true;
+        }
+
+        if ($hasRealisasi) {
+            $submission->save();
+        }
+
+        // 2. Simpan Pesan Chat / Catatan
+        $pesan = $request->input('pesan');
+        if (empty($pesan) && $hasRealisasi) {
+            $pesan = 'Pemohon mengunggah bukti nota pembelian sebesar ' . $submission->formatted_biaya_realisasi . '.';
+        }
+
+        $reply = null;
+        if (!empty($pesan)) {
+            $reply = SubmissionReply::create([
+                'submission_id' => $submission->id,
+                'admin_id' => $user->id,
+                'pesan' => $pesan,
+                'status_setelah_balasan' => null,
+            ]);
+            $reply->load('admin');
+        }
+
+        $submission->load(['user', 'division', 'category', 'replies.admin', 'expenseLogs.user']);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Pesan balasan berhasil dikirim.',
-            'data' => $reply,
+            'message' => $hasRealisasi ? 'Laporan nota pembelian berhasil diunggah.' : 'Pesan balasan berhasil dikirim.',
+            'data' => $submission,
         ], 201);
     }
 }

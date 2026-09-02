@@ -3,14 +3,14 @@ import api from '../../services/api';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Link } from 'react-router-dom';
 import {
-  AreaChart,
+  BarChart,
+  Bar,
   Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
 } from 'recharts';
 import {
   CheckSquare,
@@ -158,14 +158,52 @@ export const AdminDashboard = () => {
     );
   }
 
-  const chartData = divisionStats.map((item) => ({
-    name: item.nama_divisi || 'Divisi',
-    total_biaya: Number(item.total_biaya || item.submissions_count * 1500000 || 0),
-    jumlah_pengajuan: item.submissions_count || 0,
-    total: item.total,
-    approved: item.approved,
-  }));
+  const defaultMonths = [
+    { short : 'Jan', full: 'Januari' },
+    { short: 'Feb', full: 'Februari' },
+    { short: 'Mar', full: 'Maret' },
+    { short: 'Apr', full: 'April' },
+    { short: 'Mei', full: 'Mei' },
+    { short: 'Jun', full: 'Juni' },
+    { short: 'Jul', full: 'Juli' },
+    { short: 'Agu', full: 'Agustus' },
+    { short: 'Sep', full: 'September' },
+    { short: 'Okt', full: 'Oktober' },
+    { short: 'Nov', full: 'November' },
+    { short: 'Des', full: 'Desember' },
+  ]
 
+      const monthlyChartData = data?.monthly_stats || defaultMonths.map((m) => {
+    // 1. Cari & hitung otomatis semua pengajuan yang target bulannya cocok dengan bulan ini
+    const submissionsInMonth = recent.filter((s) =>
+      s.target_bulan?.toLowerCase().includes(m.full.toLowerCase())
+    );
+
+    let usulan = submissionsInMonth.reduce((sum, s) => sum + Number(s.total_biaya || 0), 0);
+    let realisasi = submissionsInMonth.reduce((sum, s) => sum + Number(s.biaya_realisasi || 0), 0);
+
+    // 2. Gabungkan dengan data ringkasan finansial
+    const isCurrent = finances.current_month_name?.toLowerCase().includes(m.full.toLowerCase());
+    const isNext = finances.next_month_name?.toLowerCase().includes(m.full.toLowerCase());
+
+    if (isCurrent && finances.expense_this_month) {
+      usulan = Math.max(usulan, Number(finances.expense_this_month || 0));
+      realisasi = Math.max(realisasi, Number(finances.realized_this_month || 0));
+    }
+    if (isNext && (finances.expense_next_month || finances.projected_expense_next_month)) {
+      usulan = Math.max(usulan, Number(finances.expense_next_month || finances.projected_expense_next_month || 0));
+    }
+
+    return { 
+      name: m.short, 
+      fullMonth: m.full,
+      usulan: usulan, 
+      realisasi: realisasi,
+    };
+  });
+
+  
+  
   const tanggalSekarang = new Date().toLocaleDateString('id-ID', {
     day: 'numeric',
     month: 'long',
@@ -350,66 +388,79 @@ export const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Grafik Kurva Perbandingan Pengeluaran Antar Divisi */}
+     {/* Grafik Kolom: Perbandingan Anggaran Bulanan */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
             <h3 className="font-bold text-base text-slate-900">
-              Kurva Perbandingan Pengeluaran Divisi
+              Perbandingan Anggaran Bulanan (Tahun Berjalan)
             </h3>
-            <p className="text-xs text-slate-500">
-              Visualisasi perbandingan total anggaran usulan yang diajukan oleh masing-masing divisi bulan ini
+            <p className="text-xs text-slate-500 mt-0.5">
+              Diagram kolom komparasi total usulan anggaran vs realisasi faktur sah tiap bulan
             </p>
           </div>
-          <span className="inline-flex items-center px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-full border border-emerald-200 w-fit">
-            Periode: {finances.current_month_name || 'Bulan ini'}
-          </span>
+
+          {/* Legend / Keterangan Warna Batang Kolom */}
+          <div className="flex items-center gap-4 text-xs font-semibold">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-md bg-emerald-600"></span>
+              <span className="text-slate-700">Estimasi Usulan</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-md bg-teal-500"></span>
+              <span className="text-slate-700">Realisasi Faktur Sah</span>
+            </div>
+          </div>
         </div>
 
-        {/* Area Grafik */}
-        <div className="w-full h-72 pt-4">
+        {/* Diagram Batang / Kolom Responsive */}
+        <div className="w-full h-72 pt-2">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              {/* Definisi Warna Gradient Halus */}
-              <defs>
-                <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#059669" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#059669" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-
+            <BarChart 
+              data={monthlyChartData} 
+              margin={{ top: 10, right: 20, left: 10, bottom: 0 }}
+              barGap={4}
+            >
               {/* Garis Grid Latar Belakang */}
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
 
-              {/* Sumbu X (Nama Divisi) */}
+              {/* Sumbu X: Nama Bulan */}
               <XAxis 
                 dataKey="name"
-                tick={{ fontSize: 12, fill: '#64748B' }}
-                axisLine={{ stroke: '#CBD5E1' }} 
+                tick={{ fontSize: 12, fill: '#64748B', fontWeight: 600 }}
+                axisLine={{ stroke: '#E2E8F0' }} 
                 tickLine={false}
               />
 
-              {/* Sumbu Y (Nilai Angka / Rupiah) */}
+              {/* Sumbu Y: Nilai Rupiah Singkat */}
               <YAxis
                 tick={{ fontSize: 11, fill: '#64748B' }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(value) => `Rp ${(value / 1000000).toFixed(0)}Jt`}
+                tickFormatter={(val) => `Rp ${(val / 1000000).toFixed(0)}Jt`}
               />
 
-              {/* Tooltip Kustom saat Hover Mouse */}
+              {/* Tooltip Hover */}
               <Tooltip
-                content={({ active, payload, label }) => {                        
+                cursor={{ fill: '#F8FAFC' }}
+                content={({ active, payload }) => {                        
                   if (active && payload && payload.length) {
+                    const itemData = payload[0].payload;
                     return (
-                      <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs space-y-1 border border-slate-700">
-                        <p className="font-bold text-emerald-400">{label}</p>
-                        <p className="text-slate-300">
-                          Total Usulan: <span className="font-bold text-white">{formatRupiah(payload[0].value)}</span>
+                      <div className="bg-slate-900 text-white p-3.5 rounded-xl shadow-xl text-xs space-y-1.5 border border-slate-700">
+                        <p className="font-bold text-emerald-400 border-b border-slate-700 pb-1">
+                          Periode: {itemData.fullMonth}
                         </p>
-                        <p className="text-slate-400 text-[10px]">
-                          Jumlah Usulan: {payload[0].payload.jumlah_pengajuan} Pengajuan
-                        </p>
+                        <div className="space-y-1 pt-0.5">
+                          <p className="flex justify-between gap-4 text-slate-300">
+                            <span>Estimasi Usulan:</span>
+                            <span className="font-bold text-emerald-400">{formatRupiah(itemData.usulan)}</span>
+                          </p>
+                          <p className="flex justify-between gap-4 text-slate-300">
+                            <span>Realisasi Faktur:</span>
+                            <span className="font-bold text-teal-300">{formatRupiah(itemData.realisasi)}</span>
+                          </p>
+                        </div>
                       </div>
                     );                          
                   }
@@ -417,19 +468,26 @@ export const AdminDashboard = () => {
                 }}
               />  
 
-              {/* Garis Kurva dan Arsiran Gradien (PENTING: Ini yang tadi ketinggalan) */}
-              <Area
-                type="monotone"
-                dataKey="total_biaya"
-                stroke="#059669"
-                strokeWidth={3}
-                fillOpacity={1}
-                fill="url(#colorExpense)"
+              {/* Batang Kolom 1: Estimasi Usulan (Hijau dengan ujung membulat) */}
+              <Bar 
+                dataKey="usulan" 
+                fill="#059669" 
+                radius={[6, 6, 0, 0]} 
+                maxBarSize={28}
               />
-            </AreaChart>
+
+              {/* Batang Kolom 2: Realisasi Faktur (Teal dengan ujung membulat) */}
+              <Bar 
+                dataKey="realisasi" 
+                fill="#0d9488" 
+                radius={[6, 6, 0, 0]} 
+                maxBarSize={28}
+              />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
+
 
       {/* Grid Divisi & Pengajuan Terbaru */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -443,11 +501,11 @@ export const AdminDashboard = () => {
           <div className="space-y-3">
             {divisionStats.map((d) => {
               const totalAllCost = divisionStats.reduce(
-                (acc, curr) => acc + Number(curr.total_biaya || curr.submissions_count * 1500000 || 0),
+                (acc, curr) => acc + Number(curr.total_biaya || 0),
                 0
               ) || 1;
-              const biaya = Number(d.total_biaya || d.submissions_count * 1500000 || 0);
-              const percentage = Math.round((biaya / totalAllCost) * 100);
+              const biaya = Number(d.total_biaya || 0);
+              const percentage = totalAllCost > 1 ? Math.round((biaya / totalAllCost) * 100) : 0;
 
               return (
                 <div key={d.id} className="space-y-1.5 p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-100 transition">
@@ -460,12 +518,12 @@ export const AdminDashboard = () => {
                   <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                     <div
                       className="bg-emerald-600 h-1.5 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.max(percentage, 5)}%` }}
+                      style={{ width: `${percentage > 0 ? Math.max(percentage, 5) : 0}%` }}
                     ></div>
                   </div>
 
                   <div className="flex items-center justify-between text-[10px] text-slate-500">
-                    <span>{d.submissions_count} pengajuan</span>
+                    <span>{d.submissions_count || 0} pengajuan ({selectedPeriod || finances.current_month_name || 'Bulan Ini'})</span>
                     <span className="font-bold text-emerald-700">{percentage}% porsi</span>
                   </div>
                 </div>
@@ -724,5 +782,6 @@ export const AdminDashboard = () => {
         </div>
       )}
     </div>
+    
   );
 };

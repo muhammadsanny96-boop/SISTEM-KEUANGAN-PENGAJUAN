@@ -57,7 +57,7 @@ export const UserDashboard = () => {
   }
 
   const counts = data?.counts || {};
-  const finances = data?.finances || {};
+  const finances = data?.expenses || data?.finances || {};
   const recent = data?.recent_submissions || [];
 
   return (
@@ -139,27 +139,26 @@ export const UserDashboard = () => {
             <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-800">
               <DollarSign className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="font-bold text-sm text-slate-900">Total Anggaran Usulan Bulan Ini</h3>
-              <p className="text-xs text-slate-400">{finances.current_month_name}</p>
-            </div>
+                     <div>
+            <h3 className="font-bold text-sm text-slate-900">Total Anggaran Usulan Bulan Ini</h3>
+            <p className="text-xs text-slate-400">{finances.current_month_name || 'Bulan Berjalan'}</p>
           </div>
-          <p className="text-2xl font-black text-emerald-800">{formatRupiah(finances.total_expense_this_month)}</p>
-          <p className="text-xs text-slate-500">Estimasi usulan aktif divisi {user?.division?.nama_divisi}</p>
         </div>
+        <p className="text-2xl font-black text-emerald-800">{formatRupiah(finances.this_month ?? finances.total_expense_this_month)}</p>
+        <p className="text-xs text-slate-500">Estimasi usulan aktif divisi {user?.division?.nama_divisi || 'Anda'}</p>
+      </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-teal-50 text-teal-800">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-sm text-slate-900">Proyeksi Anggaran Bulan Depan</h3>
-              <p className="text-xs text-slate-400">{finances.next_month_name}</p>
-            </div>
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-teal-50 text-teal-800">
+            <TrendingUp className="w-5 h-5" />
           </div>
-          <p className="text-2xl font-black text-teal-800">{formatRupiah(finances.projected_expense_next_month)}</p>
-          <p className="text-xs text-slate-500">Estimasi usulan periode bulan berikutnya</p>
+          <div>
+            <h3 className="font-bold text-sm text-slate-900">Proyeksi Anggaran Bulan Depan</h3>
+            <p className="text-xs text-slate-400">{finances.next_month_name || 'Bulan Berikutnya'}</p>
+          </div>
+        </div>
+        <p className="text-2xl font-black text-teal-800">{formatRupiah(finances.next_month ?? finances.projected_expense_next_month)}</p>
         </div>
       </div>
 

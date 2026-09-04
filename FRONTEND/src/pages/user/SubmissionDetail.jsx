@@ -19,7 +19,9 @@ import {
   CheckCircle2,
   Receipt,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Printer,
+  X
 } from 'lucide-react';
 
 export const SubmissionDetail = () => {
@@ -42,6 +44,7 @@ export const SubmissionDetail = () => {
   const [pesanInput, setPesanInput] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
   const [msgError, setMsgError] = useState('');
+  const [showPrintModal, setShowPrintModal] = useState(false)
   const chatBottomRef = useRef(null);
 
   const fetchDetail = async () => {
@@ -157,8 +160,11 @@ export const SubmissionDetail = () => {
     );
   }
 
-  return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6">
+    return (
+  <>
+    {/* Tampilan Layar Web (Akan Otomatis Tersembunyi Saat Dicetak) */}
+    <div className="p-8 max-w-5xl mx-auto space-y-6 print:hidden">
+
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -173,20 +179,38 @@ export const SubmissionDetail = () => {
               <h2 className="text-2xl font-black text-slate-900">{submission.nomor_pengajuan}</h2>
               <StatusBadge status={submission.status} />
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
+                       <p className="text-xs text-slate-500 mt-0.5">
               Diajukan oleh: <span className="font-semibold text-slate-700">{submission.user?.name}</span> ({submission.division?.nama_divisi})
             </p>
           </div>
         </div>
 
-        {submission.status === 'Menunggu' && (
-          <Link
-            to={`/user/submissions/${submission.id}/edit`}
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-md transition self-start sm:self-auto"
+        {/* Tombol Cetak & Edit Pengajuan (Sejajar di Kanan Header) */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowPrintModal(true)}
+            disabled={!submission.nomor_pengajuan}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-bold text-xs transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed ${
+              submission.status === 'Selesai' 
+                ? 'bg-slate-900 text-white hover:bg-slate-800' 
+                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+            title={!submission.nomor_pengajuan ? "Pengajuan harus memiliki nomor pengajuan sebelum dapat dicetak" : "Cetak berkas pengajuan"}
           >
-            Edit Pengajuan
-          </Link>
-        )}
+            <Printer className="w-4 h-4" />
+            Cetak Pengajuan
+          </button>
+
+          {submission.status === 'Menunggu' && (
+            <Link
+              to={`/user/submissions/${submission.id}/edit`}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-md transition self-start sm:self-auto"
+            >
+              Edit Pengajuan
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Alert Notifikasi Sukses / Error Laporan */}
@@ -560,8 +584,191 @@ export const SubmissionDetail = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+            {/* ========================================================================= */}
+      {/* MODAL PRATINJAU & CETAK FORMULIR PENGADAAN (RESMI PT JAMKRIDA KALSEL)      */}
+      {/* ========================================================================= */}
+      {showPrintModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
+            {/* Header Modal (Disembunyikan Otomatis Saat Dicetak) */}
+            <div className="p-4 sm:px-6 bg-slate-900 text-white flex items-center justify-between no-print">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base">Pratinjau Formulir Usulan Pengadaan</h3>
+                  <p className="text-[11px] text-slate-400">Siap dicetak ke kertas A4 atau disimpan sebagai file PDF</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1.5 transition"
+                >
+                  <Printer className="w-4 h-4" />
+                  Cetak / Simpan PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPrintModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+                  title="Tutup Pratinjau"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Area Pratinjau Kertas A4 (#printable-report) */}
+            <div className="p-4 sm:p-8 overflow-y-auto flex-1 bg-slate-100 flex justify-center">
+              <div
+                id="printable-report"
+                className="bg-white p-6 sm:p-10 shadow-sm rounded-xl max-w-3xl w-full text-slate-900 border border-slate-200"
+              >
+                {/* KOP SURAT RESMI PT JAMKRIDA KALSEL */}
+                <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-6">
+                  <img src="/logo-jamkrida.png" alt="Logo Jamkrida" className="w-16 h-16 object-contain" />
+                  <div className="text-center flex-1 pr-16">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      PEMERINTAH PROVINSI KALIMANTAN SELATAN
+                    </h3>
+                    <h1 className="text-lg font-black tracking-tight text-black mt-0.5">
+                      PT PENJAMINAN KREDIT DAERAH KALIMANTAN SELATAN
+                    </h1>
+                    <p className="text-[11px] text-slate-700 font-bold">
+                      (PT JAMKRIDA KALSEL)
+                    </p>
+                    <p className="text-[10px] text-slate-600 mt-0.5">
+                      Jl. A. Yani Km. 4.5 No. 416 Banjarmasin, Kalimantan Selatan | Telp: (0511) 3274777
+                    </p>
+                  </div>
+                </div>
+
+                {/* JUDUL FORMULIR */}
+                <div className="text-center mb-6">
+                  <h2 className="text-sm font-bold uppercase underline underline-offset-4 tracking-wide text-black">
+                    FORMULIR USULAN PENGADAAN BARANG & ANGGARAN
+                  </h2>
+                  <p className="text-xs mt-1 font-mono">Nomor Registrasi: <span className="font-bold">{submission.nomor_pengajuan}</span></p>
+                </div>
+
+                {/* IDENTITAS PEMOHON */}
+                <div className="text-xs space-y-1.5 mb-5 border border-slate-300 p-3 rounded-xs">
+                  <div className="grid grid-cols-4">
+                    <span className="font-bold text-slate-700">Tanggal Pengajuan</span>
+                    <span className="col-span-3">: {new Date(submission.created_at).toLocaleDateString('id-ID', { dateStyle: 'full' })}</span>
+                  </div>
+                  <div className="grid grid-cols-4">
+                    <span className="font-bold text-slate-700">Nama Pemohon</span>
+                    <span className="col-span-3">: {submission.user?.name}</span>
+                  </div>
+                  <div className="grid grid-cols-4">
+                    <span className="font-bold text-slate-700">Divisi / Bagian</span>
+                    <span className="col-span-3">: {submission.division?.nama_divisi || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-4">
+                    <span className="font-bold text-slate-700">Kategori Barang</span>
+                    <span className="col-span-3">: {submission.category?.nama_kategori || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-4">
+                    <span className="font-bold text-slate-700">Target Bulan Kebutuhan</span>
+                    <span className="col-span-3">: {submission.target_bulan || '-'}</span>
+                  </div>
+                </div>
+
+                {/* TABEL RINCIAN USULAN ANGGARAN */}
+                <table className="w-full border-collapse border border-black text-xs my-4">
+                  <thead>
+                    <tr className="bg-slate-100">
+                      <th className="border border-black p-2 text-center w-10">No</th>
+                      <th className="border border-black p-2 text-left">Nama Barang & Spesifikasi Teknis</th>
+                      <th className="border border-black p-2 text-center w-20">Volume</th>
+                      <th className="border border-black p-2 text-center w-20">Satuan</th>
+                      <th className="border border-black p-2 text-right w-32">Estimasi Harga</th>
+                      <th className="border border-black p-2 text-right w-36">Total Biaya Usulan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="border border-black p-2.5 text-center">1</td>
+                      <td className="border border-black p-2.5">
+                        <p className="font-bold text-slate-900">{submission.nama_barang}</p>
+                        {submission.spesifikasi && (
+                          <p className="text-[11px] text-slate-700 italic mt-1">Spesifikasi: {submission.spesifikasi}</p>
+                        )}
+                        <p className="text-[10px] text-slate-500 mt-0.5">Status: {submission.prioritas} </p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Jenis: {submission.jenis_pengajuan}</p>
+                      </td>
+                      <td className="border border-black p-2.5 text-center">{submission.jumlah}</td>
+                      <td className="border border-black p-2.5 text-center">{submission.satuan}</td>
+                      <td className="border border-black p-2.5 text-right">{formatRupiah(submission.harga_satuan)}</td>
+                      <td className="border border-black p-2.5 text-right font-bold">{formatRupiah(submission.total_biaya)}</td>
+                    </tr>
+
+                    {/* BARIS TOTAL */}
+                    <tr className="bg-slate-50 font-bold">
+                      <td colSpan="5" className="border border-black p-2.5 text-right uppercase">Total Estimasi Usulan Anggaran :</td>
+                      <td className="border border-black p-2.5 text-right">{formatRupiah(submission.total_biaya)}</td>
+                    </tr>
+
+                    {submission.biaya_realisasi && (
+                      <tr className="font-bold text-emerald-950 bg-emerald-50">
+                        <td colSpan="5" className="border border-black p-2.5 text-right uppercase">Biaya Realisasi Pembelian Sah :</td>
+                        <td className="border border-black p-2.5 text-right">{formatRupiah(submission.biaya_realisasi)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+
+                {/* JUSTIFIKASI KEBUTUHAN */}
+                <div className="border border-black p-3 text-xs mb-6">
+                  <p className="font-bold mb-1">Justifikasi & Alasan Kebutuhan Operasional:</p>
+                  <p className="text-slate-800 leading-relaxed">{submission.alasan}</p>
+                </div>
+
+                {/* CATATAN DISPOSISI */}
+                <div className="text-[11px] text-slate-500 flex justify-between border-b border-black pb-2 mb-8">
+                  <span>Status Persetujuan Dokumen: <strong className="uppercase text-black">{submission.status}</strong></span>
+                  <span>Dicetak melalui Sistem SIPENG PT Jamkrida Kalsel pada {new Date().toLocaleString('id-ID')}</span>
+                </div>
+
+                {/* LEMBAR 3 TANDA TANGAN RESMI */}
+                <div className="grid grid-cols-3 gap-6 text-center text-xs mt-10">
+                  <div>
+                    <p className="font-semibold text-slate-800">Pemohon,</p>
+                    <p className="text-[10px] text-slate-500"></p>
+                    <div className="h-20 flex items-end justify-center">
+                      <p className="font-bold underline uppercase">{submission.user?.name}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-800">Mengetahui,</p>
+                    <p className="text-[10px] text-slate-500">Kepala Divisi {submission.division?.nama_divisi || ''}</p>
+                    <div className="h-20 flex items-end justify-center">
+                      <p className="font-bold underline uppercase">( ........................................ )</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-800">Menyetujui,</p>
+                    <p className="text-[10px] text-slate-500">Direksi / Admin Anggaran</p>
+                    <div className="h-20 flex items-end justify-center">
+                      <p className="font-bold underline uppercase">
+                        {submission.status === 'Disetujui' || submission.status === 'Selesai' 
+                          ? 'ADMINISTRATOR SISTEM' 
+                          : '( ........................................ )'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </>
   );
-};
+}
 
 export default SubmissionDetail;

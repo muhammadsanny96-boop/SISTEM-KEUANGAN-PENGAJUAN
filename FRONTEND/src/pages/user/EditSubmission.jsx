@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import api from '../../services/api';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Calculator, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -11,7 +12,8 @@ export const EditSubmission = () => {
   const [months, setMonths] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setErrors] = useState({});
+  const [generalError, setGeneralError] = useState('');
 
   const [formData, setFormData] = useState({
     nama_barang: '',
@@ -38,7 +40,7 @@ export const EditSubmission = () => {
 
         const s = subRes.data.data;
         if (s.status !== 'Menunggu') {
-          alert('Pengajuan yang sudah diproses atau disetujui tidak dapat diedit.');
+          toast.error('Pengajuan yang sudah diproses atau disetujui tidak dapat diedit.');
           navigate(`/user/submissions/${id}`);
           return;
         }
@@ -89,7 +91,8 @@ export const EditSubmission = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setErrors({});
+    setGeneralError('');
     setSubmitting(true);
 
     try {
@@ -108,15 +111,18 @@ export const EditSubmission = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
+      toast.success('Usulan pengadaan berhasil diperbarui!');
       navigate(`/user/submissions/${id}`);
     } catch (err) {
       if (err.response?.data?.errors) {
-        const errorMessages = Object.values(err.response.data.errors).flat().join(' ');
-        setError(errorMessages);
+        setErrors(err.response.data.errors);  // <-- error akan berupa object
+        setGeneralError('');
       } else if (err.response?.data?.message) {
-        setError(err.response.data.message);
+        setErrors({});
+        setGeneralError(err.response.data.message);
       } else {
-        setError('Gagal memperbarui pengajuan. Periksa kembali kelengkapan formulir Anda.');
+        setErrors({});
+        setGeneralError('Gagal memperbarui pengajuan. Periksa kembali kelengkapan formulir Anda.');
       }
     } finally {
       setSubmitting(false);
@@ -145,15 +151,16 @@ export const EditSubmission = () => {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-7 shadow-sm">
-        {error && (
+        {generalError && (
           <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-sm text-rose-800">
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-rose-600" />
             <div className="space-y-1">
               <p className="font-bold">Formulir Belum Lengkap / Valid:</p>
-              <p className="text-xs leading-relaxed">{error}</p>
+              <p className="text-xs leading-relaxed">{generalError}</p>
             </div>
           </div>
-        )}
+)}
+
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -169,6 +176,9 @@ export const EditSubmission = () => {
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
               />
+              {error.nama_barang && (
+                <p className="mt-1 text-xs text-rose-600">{error.nama_barang[0]}</p>
+              )}
             </div>
 
             <div>
@@ -186,6 +196,9 @@ export const EditSubmission = () => {
                   <option key={c.id} value={c.id}>{c.nama_kategori}</option>
                 ))}
               </select>
+              {error.category_id && (
+                <p className="mt-1 text-xs text-rose-600">{error.category_id[0]}</p>
+              )}
             </div>
           </div>
 
@@ -203,6 +216,9 @@ export const EditSubmission = () => {
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
               />
+              {error.jumlah && (
+                <p className="mt-1 text-xs text-rose-600">{error.jumlah[0]}</p>
+              )}
             </div>
 
             <div>
@@ -217,6 +233,9 @@ export const EditSubmission = () => {
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
               />
+              {error.satuan && (
+                <p className="mt-1 text-xs text-rose-600">{error.satuan[0]}</p>
+              )}
             </div>
 
             <div>
@@ -232,6 +251,9 @@ export const EditSubmission = () => {
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
               />
+              {error.harga_satuan && (
+                <p className="mt-1 text-xs text-rose-600">{error.harga_satuan[0]}</p>
+              )}
             </div>
           </div>
 
@@ -261,6 +283,9 @@ export const EditSubmission = () => {
                 <option value="Barang Perlu Diganti">Barang Perlu Diganti</option>
                 <option value="Barang Perlu Dibeli">Barang Perlu Dibeli</option>
               </select>
+              {error.jenis_pengajuan && (
+                <p className="mt-1 text-xs text-rose-600">{error.jenis_pengajuan[0]}</p>
+              )}
             </div>
 
             <div>
@@ -278,6 +303,9 @@ export const EditSubmission = () => {
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
               </select>
+              {error.target_bulan && (
+                <p className="mt-1 text-xs text-rose-600">{error.target_bulan[0]}</p>
+              )}
             </div>
 
             <div>
@@ -295,6 +323,9 @@ export const EditSubmission = () => {
                 <option value="Tinggi">Tinggi</option>
                 <option value="Mendesak">Mendesak</option>
               </select>
+              {error.prioritas && (
+                <p className="mt-1 text-xs text-rose-600">{error.prioritas[0]}</p>
+              )}
             </div>
           </div>
 
@@ -310,6 +341,9 @@ export const EditSubmission = () => {
               onChange={handleChange}
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
             />
+            {error.alasan && (
+              <p className="mt-1 text-xs text-rose-600">{error.alasan[0]}</p>
+            )}
           </div>
 
           <div>
@@ -323,6 +357,9 @@ export const EditSubmission = () => {
               onChange={handleChange}
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
             />
+            {error.spesifikasi && (
+              <p className="mt-1 text-xs text-rose-600">{error.spesifikasi[0]}</p>
+            )}
           </div>
 
           <div>
@@ -335,6 +372,9 @@ export const EditSubmission = () => {
               onChange={handleFileChange}
               className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
             />
+            {error.gambar && (
+              <p className="mt-1 text-xs text-rose-600">{error.foto_barang[0]}</p>
+            )}
           </div>
 
           <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">

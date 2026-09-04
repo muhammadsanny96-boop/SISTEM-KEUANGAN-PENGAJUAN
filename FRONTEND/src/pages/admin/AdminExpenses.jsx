@@ -88,6 +88,16 @@ export const AdminExpenses = () => {
     l.division?.nama_divisi?.toLowerCase().includes(logSearch.toLowerCase()) ||
     l.tipe?.toLowerCase().includes(logSearch.toLowerCase())
   );
+  if (loading && !data) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-[50vh]">
+        <div className="flex items-center gap-3 text-slate-500 font-medium">
+          <RefreshCw className="w-5 h-5 animate-spin text-emerald-600" />
+          <span>Memuat rekapitulasi keuangan...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-8">
@@ -101,10 +111,38 @@ export const AdminExpenses = () => {
         </div>
 
         {/* Tombol Aksi & Filter */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Dropdown Filter Periode Bulan */}
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 shadow-2xs">
+            <Calendar className="w-3.5 h-3.5 text-emerald-700" />
+            <span className="text-slate-500 font-medium">Periode:</span>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-transparent text-slate-900 font-bold outline-none cursor-pointer text-xs"
+            >
+              <option value="">
+                {metrics.current_month_name || 'Bulan Berjalan'} (Aktif)
+              </option>
+              {Array.from({length: new Date().getMonth()}).map((_,i)=>{
+                const year = new Date().getFullYear();
+                const namaBulan = [
+                  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+                ][i];
+                const val = `${namaBulan}-${year}`;
+                return (
+                  <option key={val} value={val}>
+                    Arsip: {namaBulan} {year}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
           <button
             onClick={handleExportCSV}
-            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition flex items-center gap-1.5 shadow-2xs"
+            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-slate-600" />
             Export Excel
@@ -112,7 +150,7 @@ export const AdminExpenses = () => {
 
           <button
             onClick={handlePrint}
-            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md shadow-emerald-700/20"
+            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md shadow-emerald-700/20 cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             Cetak Laporan
@@ -122,7 +160,7 @@ export const AdminExpenses = () => {
 
       {/* KPI 4 Kotak Finansial Utama */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Usulan Bulan Ini</span>
           <p className="text-xl font-black text-slate-900 mt-2">{formatRupiah(metrics.total_expense_this_month)}</p>
           <p className="text-xs text-slate-400 mt-1">{metrics.current_month_name}</p>
@@ -246,6 +284,23 @@ export const AdminExpenses = () => {
           </table>
         </div>
       </div>
+            {/* Notifikasi Mode Arsip (Muncul jika admin memilih bulan lampau) */}
+      {selectedMonth && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between text-amber-900 text-xs shadow-sm">
+          <div className="flex items-center gap-2 font-medium">
+            <span className="p-1 bg-amber-200 text-amber-900 rounded-md font-bold uppercase text-[10px]">Arsip Historis</span>
+            <span>Anda sedang melihat rekapitulasi anggaran untuk periode <strong>{selectedMonth}</strong>.</span>
+          </div>
+          <button
+            onClick={() => setSelectedMonth('')}
+            className="text-amber-800 font-bold underline hover:text-amber-950 cursor-pointer"
+          >
+            Kembali ke Bulan Berjalan
+          </button>
+        </div>
+      )}
+
+      
     </div>
   );
 };

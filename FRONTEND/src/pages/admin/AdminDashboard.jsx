@@ -68,10 +68,6 @@ export const AdminDashboard = () => {
     fetchDashboard(selectedPeriod);
   }, [selectedPeriod]);
 
-  useEffect(() => {
-    fetchDashboard();
-  }, []);
-
   const formatRupiah = (number) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -111,16 +107,16 @@ export const AdminDashboard = () => {
     csvContent += `Menunggu Review (Pending);${counts.pending || 0};Perlu verifikasi & persetujuan\n`;
     csvContent += `Disetujui & Selesai;${(counts.approved || 0) + (counts.completed || 0)};Usulan yang telah disetujui / sah\n`;
     csvContent += `Ditolak;${counts.rejected || 0};Tidak memenuhi syarat / revisi\n`;
-    csvContent += `Total Estimasi Pengeluaran Bulan Ini;"${formatRupiah(finances.expense_this_month)}";Usulan aktif periode berjalan\n`;
-    csvContent += `Realisasi Anggaran Disetujui;"${formatRupiah(finances.realized_this_month)}";Realisasi nota faktur sah\n`;
-    csvContent += `Proyeksi Pengeluaran Bulan Depan;"${formatRupiah(finances.expense_next_month)}";Estimasi periode berikutnya\n\n`;
+    csvContent += `Total Estimasi Pengeluaran Bulan Ini;${Number(finances.expense_this_month) || 0};Usulan aktif periode berjalan\n`;
+    csvContent += `Realisasi Anggaran Disetujui;${Number(finances.realized_this_month) || 0};Realisasi nota faktur sah\n`;
+    csvContent += `Proyeksi Pengeluaran Bulan Depan;${Number(finances.expense_next_month) || 0};Estimasi periode berikutnya\n\n`;
 
     // 2. REKAPITULASI DIVISI
     csvContent += `2. REKAPITULASI USULAN PER DIVISI KERJA\n`;
     csvContent += `No;Nama Divisi;Jumlah Usulan;Estimasi Total Anggaran;Status\n`;
     divisionStats.forEach((d, idx) => {
-      const totalDivisi = Number(d.total_biaya || d.submissions_count * 1500000);
-      csvContent += `${idx + 1};"${d.nama_divisi}";${d.submissions_count};"${formatRupiah(totalDivisi)}";Aktif\n`;
+      const totalDivisi = Number(d.total_biaya || 0);
+      csvContent += `${idx + 1};"${d.nama_divisi}";${d.submissions_count};${totalDivisi};Aktif\n`;
     });
     csvContent += `\n`;
 
@@ -128,8 +124,10 @@ export const AdminDashboard = () => {
     csvContent += `3. DAFTAR USULAN TERBARU MASUK\n`;
     csvContent += `No;No. Pengajuan;Divisi;Pemohon;Nama Barang / Jasa;Estimasi Biaya;Status\n`;
     recent.forEach((s, idx) => {
-      csvContent += `${idx + 1};"${s.nomor_pengajuan}";"${s.division?.nama_divisi || '-'}";"${s.user?.name || '-'}";"${s.nama_barang}";"${formatRupiah(s.total_biaya)}";"${s.status}"\n`;
+      const biaya = Number(s.total_biaya) || 0;
+      csvContent += `${idx + 1};"${s.nomor_pengajuan}";"${s.division?.nama_divisi || '-'}";"${s.user?.name || '-'}";"${s.nama_barang}";${biaya};"${s.status}"\n`;
     });
+
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -147,7 +145,7 @@ export const AdminDashboard = () => {
     window.print();
   };
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="p-8 flex items-center justify-center min-h-[50vh]">
         <div className="flex items-center gap-3 text-slate-500 font-medium">
@@ -232,6 +230,7 @@ export const AdminDashboard = () => {
             <Calendar className="w-3.5 h-3.5 text-emerald-300" />
             <span className="text-emerald-300 font-medium">Periode:</span>
             <select
+            
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
               className="bg-transparent text-white font-bold outline-none cursor-pointer text-xs"
@@ -239,11 +238,19 @@ export const AdminDashboard = () => {
               <option value="" className="bg-slate-900 text-white">
                 {finances.current_month_name || 'Bulan Berjalan'} (Aktif)
               </option>
-              {availableMonths.map((m) => (
-                <option key={m} value={m} className="bg-slate-900 text-white">
-                  Arsip: {m}
-                </option>
-              ))}
+
+                {/* Opsi 12 Bulan Tahun Ini */}
+                {Array.from({length: new Date().getMonth()}).map((_,i)=>{
+                const year = new Date().getFullYear();
+                const namaBulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][i];
+                const monthNum = String(i+1).padStart(2, '0');
+                const val = `${year}-${monthNum}`;
+                return (
+                  <option key={val} value={val} className="bg-slate-900 text-white">
+                    Arsip: {namaBulan} {year}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -342,7 +349,9 @@ export const AdminDashboard = () => {
               <DollarSign className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-slate-900">Total Pengeluaran Bulan Ini</h3>
+              <h3 className="font-bold text-sm text-slate-900">
+                {selectedPeriod ? 'Total Pengeluaran (Arsip)' : 'Total Pengeluaran Bulan Ini'}
+              </h3>
               <p className="text-xs text-slate-400">{finances.current_month_name}</p>
             </div>
           </div>
@@ -432,13 +441,19 @@ export const AdminDashboard = () => {
                 tickLine={false}
               />
 
-              {/* Sumbu Y: Nilai Rupiah Singkat */}
+              {/* Sumbu Y: Nilai Rupiah Singkat & Adaptif */}
               <YAxis
                 tick={{ fontSize: 11, fill: '#64748B' }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(val) => `Rp ${(val / 1000000).toFixed(0)}Jt`}
+                tickFormatter={(val) => {
+                  if (val >= 1000000000) return `Rp ${(val / 1000000000).toFixed(1)}M`;
+                  if (val >= 1000000) return `Rp ${(val / 1000000).toFixed(0)}Jt`;
+                  if (val >= 1000) return `Rp ${(val / 1000).toFixed(0)}Rb`;
+                  return `Rp ${val}`;
+                }}
               />
+
 
               {/* Tooltip Hover */}
               <Tooltip
@@ -722,7 +737,7 @@ export const AdminDashboard = () => {
                           <td className="border border-black p-1.5 font-bold text-black">{d.nama_divisi}</td>
                           <td className="border border-black p-1.5 text-center">{d.submissions_count} usulan</td>
                           <td className="border border-black p-1.5 text-right font-black text-black">
-                            {formatRupiah(d.total_biaya || d.submissions_count * 1500000)}
+                            {formatRupiah(d.total_biaya || 0)}
                           </td>
                         </tr>
                       ))}

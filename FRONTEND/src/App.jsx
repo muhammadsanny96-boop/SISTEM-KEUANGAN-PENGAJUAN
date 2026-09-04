@@ -1,4 +1,5 @@
 import React from 'react';
+import { Toaster } from 'react-hot-toast';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -43,6 +44,22 @@ export const App = () => {
   const { user } = useAuth();
 
   return (
+    <>
+    <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          success: {
+            iconTheme: { primary: '#10b981', secondary: 'white' },
+            style: { borderRadius: '1rem', border: '1px solid #10b981', background: '#fff' },
+          },
+          error: {
+            iconTheme: { primary: '#ef4444', secondary: 'white' },
+            style: { borderRadius: '1rem', border: '1px solid #ef4444', background: '#fff' },
+          },
+          loading: { style: { borderRadius: '1rem' } },
+        }}
+      />
     <Routes>
       {/* Public Landing & Auth */}
       <Route
@@ -98,10 +115,12 @@ export const App = () => {
         }
       />
 
-      {/* 404 Fallback */}
+           {/* 404 Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+  </>
   );
 };
 
 export default App;
+   

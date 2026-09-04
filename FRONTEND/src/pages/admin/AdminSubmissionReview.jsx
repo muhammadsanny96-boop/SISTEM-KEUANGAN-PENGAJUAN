@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import toast from 'react-hot-toast';
 import api from '../../services/api';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -40,6 +41,9 @@ export const AdminSubmissionReview = () => {
   const [biayaRealisasi, setBiayaRealisasi] = useState('');
   const [tanggalRealisasi, setTanggalRealisasi] = useState('');
   const [receiptFile, setReceiptFile] = useState(null);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [showApproveModal, setShowApproveModal] = useState(false);
 
   // Quick chat state
   const [quickMsg, setQuickMsg] = useState('');
@@ -115,20 +119,29 @@ export const AdminSubmissionReview = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      setSuccess(`Status pengajuan berhasil diubah menjadi: ${targetStatus}`);
+      toast.success(`Status pengajuan berhasil diubah menjadi: ${targetStatus}`);
       fetchDetail();
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal memproses tindakan.');
+      toast.error(err.response?.data?.message || 'Gagal memproses tindakan.');
     } finally {
       setSubmitting(false);
     }
   };
+  // 1. Fungsi Konfirmasi Penolakan dari Modal
+  const handleConfirmReject = (e) => {
+    e.preventDefault();
+    if (!rejectReason.trim()) {
+      toast.error('Alasan penolakan wajib diisi!');
+      return;
+    }
+    handleDirectAction('Ditolak', rejectReason.trim());
+    setShowRejectModal(false);
+    setRejectReason('');
+  };
 
-  // Form Submit untuk Realisasi & Penyelesaian Manual oleh Admin
+  // 2. Form Submit untuk Realisasi & Penyelesaian Manual oleh Admin
   const handleManualStatusSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
     setSubmitting(true);
 
     try {
@@ -145,18 +158,12 @@ export const AdminSubmissionReview = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      setSuccess('Pengadaan berhasil diselesaikan dan biaya realisasi sah telah tercatat!');
+      toast.success('Pengadaan berhasil diselesaikan dan biaya realisasi sah tercatat!');
       setPesan('');
       setShowManualForm(false);
       fetchDetail();
     } catch (err) {
-      if (err.response?.data?.errors) {
-        setError(Object.values(err.response.data.errors)[0][0]);
-      } else if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else {
-        setError('Gagal menyelesaikan pengadaan.');
-      }
+      toast.error(err.response?.data?.message || 'Gagal menyelesaikan pengadaan.');
     } finally {
       setSubmitting(false);
     }
@@ -259,45 +266,30 @@ export const AdminSubmissionReview = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 pt-1">
-                  {/* Tombol Setujui */}
+                  {/* Tombol Setujui Anggaran */}
                   <button
                     type="button"
                     disabled={submitting}
-                    onClick={() => handleDirectAction('Disetujui', 'Usulan anggaran telah disetujui. Pemohon dipersilakan melakukan pembelian dan mengunggah nota.')}
-                    className="flex-1 min-w-[150px] py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50"
+                    onClick={() => setShowApproveModal(true)}
+                    className="flex-1 min-w-[150px] py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     Setujui Anggaran Belanja
                   </button>
 
-                  {/* Tombol Proses */}
-                  {submission.status === 'Menunggu' && (
-                    <button
-                      type="button"
-                      disabled={submitting}
-                      onClick={() => handleDirectAction('Diproses', 'Pengajuan sedang dalam proses peninjauan.')}
-                      className="py-3 px-4 bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold text-xs rounded-xl border border-blue-200 transition flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      Tandai Diproses
-                    </button>
-                  )}
-
                   {/* Tombol Tolak Usulan */}
                   <button
                     type="button"
                     disabled={submitting}
-                    onClick={() => {
-                      const alasan = window.prompt('Masukkan alasan penolakan untuk pemohon:');
-                      if (alasan) handleDirectAction('Ditolak', alasan);
-                    }}
-                    className="py-3 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                    onClick={() => setShowRejectModal(true)}
+                    className="flex-1 min-w-[150px] py-3 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                   >
+                    <XCircle className="w-4 h-4" />
                     Tolak Usulan
                   </button>
                 </div>
               </div>
             )}
-
             {/* KONDISI 2: STATUS 'DISETUJUI' (VERIFIKASI NOTA DARI USER ATAU INPUT MANUAL) */}
             {submission.status === 'Disetujui' && (
               <div className="space-y-4">
@@ -715,6 +707,122 @@ export const AdminSubmissionReview = () => {
           </div>
         </div>
       </div>
+      {/* MODAL DIALOG PENOLAKAN USULAN */}
+            {/* MODAL DIALOG KONFIRMASI PERSETUJUAN ANGGARAN */}
+      {showApproveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-emerald-100 text-emerald-700 rounded-xl">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Konfirmasi Persetujuan Anggaran</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pastikan usulan anggaran dan spesifikasi barang telah diverifikasi dengan benar.
+                </p>
+              </div>
+            </div>
+
+            {/* Kotak Ringkasan Usulan */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2 text-xs">
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Barang / Pengadaan:</span>
+                <span className="font-bold text-slate-900 text-right">{submission.nama_barang}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Divisi Pemohon:</span>
+                <span className="font-semibold text-slate-800">{submission.division?.nama_divisi} ({submission.user?.name})</span>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                <span className="font-bold text-slate-700">Total Anggaran Disetujui:</span>
+                <span className="font-black text-emerald-700 text-sm">{formatRupiah(submission.total_biaya)}</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] bg-amber-50 border border-amber-200/70 p-2.5 rounded-lg leading-relaxed text-amber-900">
+              💡 <strong>Pemberitahuan:</strong> Setelah disetujui, pemohon akan menerima notifikasi untuk segera melakukan pembelian barang dan mengunggah nota kuitansi sah.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowApproveModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => {
+                  handleDirectAction('Disetujui', 'Usulan anggaran telah disetujui. Pemohon dipersilakan melakukan pembelian dan mengunggah nota.');
+                  setShowApproveModal(false);
+                }}
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Ya, Sahkan & Setujui Anggaran
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-rose-100 text-rose-600 rounded-xl">
+                <XCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Tolak Usulan Pengadaan</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Berikan alasan penolakan agar pemohon mengetahui alasan usulan ini tidak disetujui.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmReject} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Alasan Penolakan *
+                </label>
+                <textarea
+                  rows="3"
+                  required
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Contoh: Anggaran divisi untuk kategori ini sudah melampaui batas bulan berjalan..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRejectModal(false);
+                    setRejectReason('');
+                  }}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  Konfirmasi Tolak Usulan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

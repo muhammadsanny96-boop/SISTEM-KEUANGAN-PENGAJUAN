@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import api from '../../services/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -11,7 +12,8 @@ export const CreateSubmission = () => {
   const [categories, setCategories] = useState([]);
   const [months, setMonths] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [generalError, setGeneralError] = useState('');
 
   const [formData, setFormData] = useState({
     nama_barang: '',
@@ -70,7 +72,8 @@ export const CreateSubmission = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setErrors({});
+    setGeneralError('');
     setLoading(true);
 
     try {
@@ -88,15 +91,15 @@ export const CreateSubmission = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
+      toast.success('Pengajuan berhasil dibuat!');
       navigate(`/user/submissions/${res.data.data.id}`);
     } catch (err) {
       if (err.response?.data?.errors) {
-        const errorMessages = Object.values(err.response.data.errors).flat().join(' ');
-        setError(errorMessages);
+        setErrors(err.response.data.errors);
       } else if (err.response?.data?.message) {
-        setError(err.response.data.message);
+        setGeneralError(err.response.data.message);
       } else {
-        setError('Gagal membuat pengajuan. Periksa kembali kelengkapan formulir Anda.');
+        setGeneralError('Gagal membuat pengajuan. Periksa kembali kelengkapan formulir Anda.');
       }
     } finally {
       setLoading(false);
@@ -121,12 +124,12 @@ export const CreateSubmission = () => {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-7 shadow-sm">
-        {error && (
+        {generalError && (
           <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-sm text-rose-800">
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-rose-600" />
             <div className="space-y-1">
-              <p className="font-bold">Formulir Belum Lengkap / Valid:</p>
-              <p className="text-xs leading-relaxed">{error}</p>
+              <p className="font-bold">Terjadi Kesalahan! Silahkan Check Kembali</p>
+              <p className="text-xs leading-relaxed">{generalError}</p>
             </div>
           </div>
         )}
@@ -146,6 +149,7 @@ export const CreateSubmission = () => {
                 placeholder="Contoh: Laptop Kerja Developer 16GB"
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
               />
+              {errors.nama_barang && (<p className="text-rose-600 text-xs mt-1">{errors.nama_barang[0]}</p>)}
             </div>
 
             <div>
@@ -163,6 +167,7 @@ export const CreateSubmission = () => {
                   <option key={c.id} value={c.id}>{c.nama_kategori}</option>
                 ))}
               </select>
+              {errors.category_id && (<p className="text-rose-600 text-xs mt-1">{errors.category_id[0]}</p>)}
             </div>
           </div>
 
@@ -180,6 +185,7 @@ export const CreateSubmission = () => {
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
               />
+              {errors.jumlah && (<p className="text-rose-600 text-xs mt-1">{errors.jumlah[0]}</p>)}
             </div>
 
             <div>
@@ -195,6 +201,7 @@ export const CreateSubmission = () => {
                 placeholder="Unit / Pcs / Rim / Box"
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
               />
+              {errors.satuan && (<p className="text-rose-600 text-xs mt-1">{errors.satuan[0]}</p>)}
             </div>
 
             <div>
@@ -211,6 +218,7 @@ export const CreateSubmission = () => {
                 placeholder="Contoh: 15000000"
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
               />
+              {errors.harga_satuan && (<p className="text-rose-600 text-xs mt-1">{errors.harga_satuan[0]}</p>)}
             </div>
           </div>
 
@@ -291,6 +299,7 @@ export const CreateSubmission = () => {
               placeholder="Jelaskan alasan kebutuhan pengadaan barang/jasa ini bagi operasional divisi..."
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
             />
+            {errors.alasan && (<p className="text-rose-600 text-xs mt-1">{errors.alasan[0]}</p>)}
           </div>
 
           <div>
@@ -305,6 +314,7 @@ export const CreateSubmission = () => {
               placeholder="Tuliskan spesifikasi teknis, merek yang direkomendasikan, atau ketentuan barang..."
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-700"
             />
+            {errors.spesifikasi && (<p className="text-rose-600 text-xs mt-1">{errors.spesifikasi[0]}</p>)}
           </div>
 
           <div>
@@ -317,6 +327,7 @@ export const CreateSubmission = () => {
               onChange={handleFileChange}
               className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
             />
+            {errors.foto_barang && (<p className="text-rose-600 text-xs mt-1">{errors.foto_barang[0]}</p>)}
           </div>
 
           <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
